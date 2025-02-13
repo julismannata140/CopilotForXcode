@@ -13,6 +13,12 @@ public extension ChatMemory {
         await mutateHistory { history in
             if let index = history.firstIndex(where: { $0.id == message.id }) {
                 history[index].content = history[index].content + message.content
+                history[index].references.append(contentsOf: message.references)
+                history[index].followUp = message.followUp
+                history[index].suggestedTitle = message.suggestedTitle
+                if let errorMessage = message.errorMessage {
+                    history[index].errorMessage = (history[index].errorMessage ?? "") + errorMessage
+                }
             } else {
                 history.append(message)
             }

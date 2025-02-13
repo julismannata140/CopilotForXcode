@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import GitHubCopilotService
+import GitHubCopilotViewModel
 import SwiftUI
 
 struct AppInfoView: View {
@@ -68,7 +69,7 @@ struct AppInfoView: View {
 
 #Preview {
     AppInfoView(
-        viewModel: .init(),
+        viewModel: GitHubCopilotViewModel.shared,
         store: .init(initialState: .init(), reducer: { General() })
     )
 }

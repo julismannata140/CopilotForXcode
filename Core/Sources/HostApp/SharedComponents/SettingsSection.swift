@@ -21,7 +21,7 @@ struct SettingsSection<Content: View, Footer: View>: View {
                 .padding(.horizontal, 10)
             if showWarning {
                 HStack{
-                    Text("GitHub Copilot features are disabled. Please check your subscription to access them.")
+                    Text("GitHub Copilot features are disabled. Please [check your subscription](https://github.com/settings/copilot) to access them.")
                         .foregroundColor(Color("WarningForegroundColor"))
                         .padding(4)
                     Spacer()

@@ -360,7 +360,8 @@ extension WidgetWindowsController {
             await MainActor.run {
                 let state = store.withState { $0 }
                 let isChatPanelDetached = state.chatPanelState.isDetached
-                let hasChat = !state.chatPanelState.chatTabGroup.tabInfo.isEmpty
+                let hasChat = state.chatPanelState.currentChatWorkspace != nil
+                    && !state.chatPanelState.currentChatWorkspace!.tabInfo.isEmpty
 
                 if let activeApp, activeApp.isXcode {
                     let application = activeApp.appElement

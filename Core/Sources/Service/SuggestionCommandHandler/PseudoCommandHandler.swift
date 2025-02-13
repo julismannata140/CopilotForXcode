@@ -9,6 +9,7 @@ import Workspace
 import WorkspaceSuggestionService
 import XcodeInspector
 import XPCShared
+import AXHelper
 
 /// It's used to run some commands without really triggering the menu bar item.
 ///
@@ -88,6 +89,13 @@ struct PseudoCommandHandler {
                     lines: editorContent.lines,
                     cursorPosition: editorContent.cursorPosition
                 )
+            }
+            if !filespace.errorMessage.isEmpty {
+                presenter
+                    .presentWarningMessage(
+                        filespace.errorMessage,
+                        url: "https://github.com/github-copilot/signup/copilot_individual"
+                    )
             }
             if filespace.presentingSuggestion != nil {
                 presenter.presentSuggestion(fileURL: fileURL)
@@ -324,56 +332,14 @@ extension PseudoCommandHandler {
         _ result: UpdatedContent,
         focusElement: AXUIElement
     ) throws {
-        let oldPosition = focusElement.selectedTextRange
-        let oldScrollPosition = focusElement.parent?.verticalScrollBar?.doubleValue
-
-        let error = AXUIElementSetAttributeValue(
-            focusElement,
-            kAXValueAttribute as CFString,
-            result.content as CFTypeRef
-        )
-
-        if error != AXError.success {
-            PresentInWindowSuggestionPresenter()
-                .presentErrorMessage("Fail to set editor content.")
-        }
-
-        // recover selection range
-
-        if let selection = result.newSelection {
-            var range = SourceEditor.convertCursorRangeToRange(selection, in: result.content)
-            if let value = AXValueCreate(.cfRange, &range) {
-                AXUIElementSetAttributeValue(
-                    focusElement,
-                    kAXSelectedTextRangeAttribute as CFString,
-                    value
-                )
+        try AXHelper().injectUpdatedCodeWithAccessibilityAPI(
+            result,
+            focusElement: focusElement,
+            onError: {
+                PresentInWindowSuggestionPresenter()
+                    .presentErrorMessage("Fail to set editor content.")
             }
-        } else if let oldPosition {
-            var range = CFRange(
-                location: oldPosition.lowerBound,
-                length: 0
-            )
-            if let value = AXValueCreate(.cfRange, &range) {
-                AXUIElementSetAttributeValue(
-                    focusElement,
-                    kAXSelectedTextRangeAttribute as CFString,
-                    value
-                )
-            }
-        }
-
-        // recover scroll position
-
-        if let oldScrollPosition,
-           let scrollBar = focusElement.parent?.verticalScrollBar
-        {
-            AXUIElementSetAttributeValue(
-                scrollBar,
-                kAXValueAttribute as CFString,
-                oldScrollPosition as CFTypeRef
-            )
-        }
+        )        
     }
 
     func getFileContent(sourceEditor: AXUIElement?) async

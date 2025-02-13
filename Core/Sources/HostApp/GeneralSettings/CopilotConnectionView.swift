@@ -1,10 +1,11 @@
 import ComposableArchitecture
+import GitHubCopilotViewModel
 import SwiftUI
 
 struct CopilotConnectionView: View {
     @AppStorage("username") var username: String = ""
     @Environment(\.toast) var toast
-    @StateObject var viewModel = GitHubCopilotViewModel()
+    @StateObject var viewModel: GitHubCopilotViewModel
 
     let store: StoreOf<General>
 
@@ -99,16 +100,16 @@ struct CopilotConnectionView: View {
 
 #Preview {
     CopilotConnectionView(
-        viewModel: .init(),
+        viewModel: GitHubCopilotViewModel.shared,
         store: .init(initialState: .init(), reducer: { General() })
     )
 }
 
 #Preview("Running") {
-    let runningModel = GitHubCopilotViewModel()
+    let runningModel =  GitHubCopilotViewModel.shared
     runningModel.isRunningAction = true
     return CopilotConnectionView(
-        viewModel: runningModel,
+        viewModel: GitHubCopilotViewModel.shared,
         store: .init(initialState: .init(), reducer: { General() })
     )
 }

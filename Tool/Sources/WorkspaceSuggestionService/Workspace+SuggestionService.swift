@@ -3,6 +3,7 @@ import GitHubCopilotService
 import SuggestionBasic
 import SuggestionProvider
 import Workspace
+import Status
 import XPCShared
 
 public extension Workspace {
@@ -76,7 +77,13 @@ public extension Workspace {
             workspaceInfo: .init(workspaceURL: workspaceURL, projectURL: projectRootURL)
         )
 
-        filespace.setSuggestions(completions)
+        let clsStatus = await Status.shared.getCLSStatus()
+        if clsStatus.isErrorStatus {
+            filespace.setError(clsStatus.message)
+        } else {
+            filespace.setError("")
+            filespace.setSuggestions(completions)
+        }
 
         return completions
     }

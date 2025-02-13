@@ -67,6 +67,7 @@ struct General {
                         _ = try await service
                             .send(requestBody: ExtensionServiceRequests.OpenExtensionManager())
                     } catch {
+                        Logger.ui.error("Failed to open extension manager. \(error.localizedDescription)")
                         toast(error.localizedDescription, .error)
                         await send(.failedReloading)
                     }

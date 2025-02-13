@@ -15,13 +15,8 @@ public enum ExtensionPermissionStatus {
 
 public struct CLSStatus: Equatable {
     public enum Status {
-        case unknown
-        case normal
-        case inProgress
-        case error
-        case warning
-        case inactive
-    }
+            case unknown, normal, inProgress, error, warning, inactive
+        }
 
     public let status: Status
     public let message: String
@@ -37,14 +32,29 @@ public struct CLSStatus: Equatable {
 
 public struct AuthStatus: Equatable {
     public enum Status {
-        case unknown
-        case loggedIn
-        case notLoggedIn
-    }
+            case unknown, loggedIn, notLoggedIn, notAuthorized
+        }
 
     public let status: Status
     public let username: String?
     public let message: String?
+}
+
+private struct AuthStatusInfo {
+    let authIcon: StatusResponse.Icon?
+    let authStatus: AuthStatus.Status
+    let userName: String?
+}
+
+private struct CLSStatusInfo {
+    let icon: StatusResponse.Icon?
+    let message: String
+}
+
+private struct ExtensionStatusInfo {
+    let icon: StatusResponse.Icon?
+    let message: String?
+    let url: String?
 }
 
 public extension Notification.Name {
@@ -55,21 +65,28 @@ public extension Notification.Name {
 public struct StatusResponse {
     public struct Icon {
         public let name: String
+        // isTemplate = true, monochrome icon; isTemplate = false, colored icon
+        public let isTemplate: Bool
 
-        public init(name: String) {
+        public init(name: String, isTemplate: Bool = true) {
             self.name = name
+            self.isTemplate = isTemplate
         }
 
         public var nsImage: NSImage? {
-            NSImage(named: name)
+            let image = NSImage(named: name)
+            image?.isTemplate = isTemplate
+            return image
         }
     }
 
     public let icon: Icon
     public let inProgress: Bool
+    public let clsMessage: String
     public let message: String?
     public let url: String?
-    public let authMessage: String
+    public let authStatus: AuthStatus.Status
+    public let userName: String?
 }
 
 public final actor Status {
@@ -80,7 +97,7 @@ public final actor Status {
     private var clsStatus = CLSStatus(status: .unknown, message: "")
     private var authStatus = AuthStatus(status: .unknown, username: nil, message: nil)
 
-    private let okIcon = StatusResponse.Icon(name: "MenuBarIcon")
+    private let okIcon = StatusResponse.Icon(name: "MenuBarIcon", isTemplate: false)
     private let errorIcon = StatusResponse.Icon(name: "MenuBarWarningIcon")
     private let inactiveIcon = StatusResponse.Icon(name: "MenuBarInactiveIcon")
 
@@ -113,101 +130,113 @@ public final actor Status {
     }
 
     public func getAXStatus() -> ObservedAXStatus {
-        // if Xcode is running, return the observed status
         if isXcodeRunning() {
             return axStatus
         } else if AXIsProcessTrusted() {
-            // if Xcode is not running but AXIsProcessTrusted() is true, return granted
             return .granted
         } else {
-            // otherwise, return the last observed status, which may be unknown
             return axStatus
         }
     }
 
     private func isXcodeRunning() -> Bool {
-        let xcode = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dt.Xcode")
-        return !xcode.isEmpty
+        !NSRunningApplication.runningApplications(
+            withBundleIdentifier: "com.apple.dt.Xcode"
+        ).isEmpty
     }
 
     public func getAuthStatus() -> AuthStatus.Status {
-        return authStatus.status
+        authStatus.status
+    }
+
+    public func getCLSStatus() -> CLSStatus {
+        clsStatus
     }
 
     public func getStatus() -> StatusResponse {
-        let (authIcon, authMessage) = getAuthStatusInfo()
-        let (icon, message, url) = getExtensionStatusInfo()
+        let authStatusInfo: AuthStatusInfo = getAuthStatusInfo()
+        let clsStatusInfo: CLSStatusInfo = getCLSStatusInfo()
+        let extensionStatusInfo: ExtensionStatusInfo = getExtensionStatusInfo()
         return .init(
-            icon: authIcon ?? icon ?? okIcon,
+            icon: authStatusInfo.authIcon ?? clsStatusInfo.icon ?? extensionStatusInfo.icon ?? okIcon,
             inProgress: clsStatus.status == .inProgress,
-            message: message,
-            url: url,
-            authMessage: authMessage
+            clsMessage: clsStatus.message,
+            message: extensionStatusInfo.message,
+            url: extensionStatusInfo.url,
+            authStatus: authStatusInfo.authStatus,
+            userName: authStatusInfo.userName
         )
     }
 
-    private func getAuthStatusInfo() -> (authIcon: StatusResponse.Icon?, authMessage: String) {
+    private func getAuthStatusInfo() -> AuthStatusInfo {
         switch authStatus.status {
-        case .unknown,
-            .loggedIn:
-            (authIcon: nil, authMessage: "Logged in as \(authStatus.username ?? "")")
+        case .unknown, .loggedIn:
+            return AuthStatusInfo(
+                authIcon: nil,
+                authStatus: authStatus.status,
+                userName: authStatus.username
+            )
         case .notLoggedIn:
-            (authIcon: errorIcon, authMessage: authStatus.message ?? "Not logged in")
+            return AuthStatusInfo(
+                authIcon: errorIcon,
+                authStatus: authStatus.status,
+                userName: nil
+            )
+        case .notAuthorized:
+            return AuthStatusInfo(
+                authIcon: inactiveIcon,
+                authStatus: authStatus.status,
+                userName: authStatus.username
+            )
         }
     }
-
-    private func getExtensionStatusInfo() -> (icon: StatusResponse.Icon?, message: String?, url: String?) {
+    
+    private func getCLSStatusInfo() -> CLSStatusInfo {
         if clsStatus.isInactiveStatus {
-            return (icon: inactiveIcon, message: clsStatus.message, url: nil)
-        } else if clsStatus.isErrorStatus {
-            return (icon: errorIcon, message: clsStatus.message, url: nil)
+            return CLSStatusInfo(icon: inactiveIcon, message: clsStatus.message)
         }
+        if clsStatus.isErrorStatus {
+            return CLSStatusInfo(icon: errorIcon, message: clsStatus.message)
+        }
+        return CLSStatusInfo(icon: nil, message: "")
+    }
 
+    private func getExtensionStatusInfo() -> ExtensionStatusInfo {
         if extensionStatus == .failed {
-            // TODO differentiate between the permission not being granted and the
-            // extension just getting disabled by Xcode.
-            return (
+            return ExtensionStatusInfo(
                 icon: errorIcon,
                 message: """
-                  Extension is not enabled. Enable GitHub Copilot under Xcode
-                  and then restart Xcode.
-                  """,
+                Enable Copilot in Xcode & restart
+                """,
                 url: "x-apple.systempreferences:com.apple.ExtensionsPreferences"
             )
         }
 
         switch getAXStatus() {
         case .granted:
-            return (icon: nil, message: nil, url: nil)
+            return ExtensionStatusInfo(icon: nil, message: nil, url: nil)
         case .notGranted:
-            return (
+            return ExtensionStatusInfo(
                 icon: errorIcon,
                 message: """
-                  Accessibility permission not granted. \
-                  Click to open System Preferences.
-                  """,
+                Enable accessibility in system preferences
+                """,
                 url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
             )
         case .unknown:
-            return (
+            return ExtensionStatusInfo(
                 icon: errorIcon,
                 message: """
-                  Accessibility permission not granted or Copilot restart needed.
-                  """,
+                Enable accessibility or restart Copilot
+                """,
                 url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
             )
         }
     }
 
     private func broadcast() {
-        NotificationCenter.default.post(
-            name: .serviceStatusDidChange,
-            object: nil
-        )
+        NotificationCenter.default.post(name: .serviceStatusDidChange, object: nil)
         // Can remove DistributedNotificationCenter if the settings UI moves in-process
-        DistributedNotificationCenter.default().post(
-            name: .serviceStatusDidChange,
-            object: nil
-        )
+        DistributedNotificationCenter.default().post(name: .serviceStatusDidChange, object: nil)
     }
 }

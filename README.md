@@ -1,17 +1,23 @@
 # <img align="center" height="70" src="./Docs/AppIcon.png"/> GitHub Copilot for Xcode
 
-<img alt="Demo of GitHub Copilot for Xcode" src="./Docs/demo.gif" width="800" />
-
 [GitHub Copilot](https://github.com/features/copilot) is an AI pair programmer
-tool that helps you write code faster and smarter. Copilot for Xcode is an Xcode
-extension that provides inline coding suggestions as you type.
+tool that helps you write code faster and smarter. Copilot for Xcode is an Xcode extension that provides inline coding suggestions as you type and a chat assistant to answer your coding questions.
 
-## Beta Preview Policy
+## Chat [Preview]
+
+GitHub Copilot Chat provides suggestions to your specific coding tasks via chat.
+<img alt="Chat of GitHub Copilot for Xcode" src="./Docs/chat_dark.gif" width="800" />
+
+## Code Completion
+
+You can receive auto-complete type suggestions from GitHub Copilot either by starting to write the code you want to use, or by writing a natural language comment describing what you want the code to do.
+<img alt="Code Completion of GitHub Copilot for Xcode" src="./Docs/demo.gif" width="800" />
+
+## Preview Policy
 
 Use of the GitHub Copilot Xcode Extension is subject to [GitHub's Pre-Release Terms](https://docs.github.com/en/site-policy/github-terms/github-pre-release-license-terms). We want to remind you that:
 
-> Beta Previews may not be supported or may change at any time. You may receive confidential information through those programs that must remain confidential while the program is private. We'd love your feedback to make our Beta Previews better.
-
+> Previews may not be supported or may change at any time. You may receive confidential information through those programs that must remain confidential while the program is private. We'd love your feedback to make our Previews better.
 
 ## Requirements
 
@@ -39,7 +45,7 @@ Use of the GitHub Copilot Xcode Extension is subject to [GitHub's Pre-Release Te
 
 1. Open the `GitHub Copilot for Xcode` application (from the `Applications` folder). Accept the security warning.
    <p align="center">
-     <img alt="Screenshot of MacOS download permission request" src="./Docs/macos-download-open-confirm.png" width="529" />
+     <img alt="Screenshot of MacOS download permission request" src="./Docs/macos-download-open-confirm.png" width="350" />
    </p>
 
 
@@ -103,6 +109,25 @@ Use of the GitHub Copilot Xcode Extension is subject to [GitHub's Pre-Release Te
    <p align="center">
      <img alt="Screenshot of welcome screen" src="./Docs/welcome.png" width="672" />
    </p>
+
+## How to use Chat [Preview]
+
+   Open Copilot Chat in GitHub Copilot.
+  - Open via the Xcode menu `Xcode -> Editor -> GitHub Copilot -> Open Chat`.
+  <p align="center">
+    <img alt="Screenshot of Xcode Editor GitHub Copilot menu item" src="./Docs/xcode-menu_dark.png" width="648" />
+  </p>
+
+  - Open via GitHub Copilot app menu `Open Chat`.
+
+  <p align="center">
+    <img alt="Screenshot of GitHub Copilot menu item" src="./Docs/copilot-menu_dark.png" width="182" />
+  </p>
+
+## How to use Code Completion
+
+   Press `tab` to accept the first line of a suggestion, hold `option` to view
+   the full suggestion, and press `option` + `tab` to accept the full suggestion.
 
 ## License
 

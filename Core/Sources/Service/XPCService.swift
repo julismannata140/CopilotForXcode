@@ -148,7 +148,7 @@ public class XPCService: NSObject, XPCServiceProtocol {
         withReply reply: @escaping (Data?, Error?) -> Void
     ) {
         let handler = PseudoCommandHandler()
-        handler.openChat(forceDetach: false)
+        handler.openChat(forceDetach: true)
         reply(nil, nil)
     }
 

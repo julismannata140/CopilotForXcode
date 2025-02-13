@@ -19,9 +19,9 @@ struct GUI {
     struct State: Equatable {
         var suggestionWidgetState = WidgetFeature.State()
 
-        var chatTabGroup: ChatPanelFeature.ChatTabGroup {
-            get { suggestionWidgetState.chatPanelState.chatTabGroup }
-            set { suggestionWidgetState.chatPanelState.chatTabGroup = newValue }
+        var chatHistory: ChatHistory {
+            get { suggestionWidgetState.chatPanelState.chatHistory }
+            set { suggestionWidgetState.chatPanelState.chatHistory = newValue }
         }
 
         var promptToCodeGroup: PromptToCodeGroup.State {
@@ -34,11 +34,13 @@ struct GUI {
         case start
         case openChatPanel(forceDetach: Bool)
         case createAndSwitchToChatTabIfNeeded
-        case createAndSwitchToBrowserTabIfNeeded(url: URL)
+//        case createAndSwitchToBrowserTabIfNeeded(url: URL)
         case sendCustomCommandToActiveChat(CustomCommand)
         case toggleWidgetsHotkeyPressed
 
         case suggestionWidget(WidgetFeature.Action)
+        case switchWorkspace(path: String, name: String)
+        case initWorkspaceChatTabIfNeeded(path: String)
 
         static func promptToCodeGroup(_ action: PromptToCodeGroup.Action) -> Self {
             .suggestionWidget(.panel(.sharedPanel(.promptToCodeGroup(action))))
@@ -63,22 +65,27 @@ struct GUI {
             }
 
             Scope(
-                state: \.chatTabGroup,
+                state: \.chatHistory,
                 action: \.suggestionWidget.chatPanel
             ) {
                 Reduce { _, action in
                     switch action {
                     case let .createNewTapButtonClicked(kind):
+//                        return .run { send in
+//                            if let (_, chatTabInfo) = await chatTabPool.createTab(for: kind) {
+//                                await send(.createNewTab(chatTabInfo))
+//                            }
+//                        }
                         return .run { send in
                             if let (_, chatTabInfo) = await chatTabPool.createTab(for: kind) {
                                 await send(.appendAndSelectTab(chatTabInfo))
                             }
                         }
 
-                    case let .closeTabButtonClicked(id):
-                        return .run { _ in
-                            chatTabPool.removeTab(of: id)
-                        }
+//                    case let .closeTabButtonClicked(id):
+//                        return .run { _ in
+//                            chatTabPool.removeTab(of: id)
+//                        }
 
                     case let .chatTab(_, .openNewTab(builder)):
                         return .run { send in
@@ -125,14 +132,15 @@ struct GUI {
                     }
 
                 case .createAndSwitchToChatTabIfNeeded:
-                    if let selectedTabInfo = state.chatTabGroup.selectedTabInfo,
+                    
+                    if let currentChatWorkspace = state.chatHistory.currentChatWorkspace, let selectedTabInfo = currentChatWorkspace.selectedTabInfo,
                        chatTabPool.getTab(of: selectedTabInfo.id) is ConversationTab
                     {
                         // Already in Chat tab
                         return .none
                     }
 
-                    if let firstChatTabInfo = state.chatTabGroup.tabInfo.first(where: {
+                    if let firstChatTabInfo = state.chatHistory.currentChatWorkspace?.tabInfo.first(where: {
                         chatTabPool.getTab(of: $0.id) is ConversationTab
                     }) {
                         return .run { send in
@@ -149,52 +157,69 @@ struct GUI {
                         }
                     }
 
-                case let .createAndSwitchToBrowserTabIfNeeded(url):
-                    #if canImport(BrowserChatTab)
-                    func match(_ tabURL: URL?) -> Bool {
-                        guard let tabURL else { return false }
-                        return tabURL == url
-                            || tabURL.absoluteString.hasPrefix(url.absoluteString)
-                    }
-
-                    if let selectedTabInfo = state.chatTabGroup.selectedTabInfo,
-                       let tab = chatTabPool.getTab(of: selectedTabInfo.id) as? BrowserChatTab,
-                       match(tab.url)
-                    {
-                        // Already in the target Browser tab
-                        return .none
-                    }
-
-                    if let firstChatTabInfo = state.chatTabGroup.tabInfo.first(where: {
-                        guard let tab = chatTabPool.getTab(of: $0.id) as? BrowserChatTab,
-                              match(tab.url)
-                        else { return false }
-                        return true
-                    }) {
-                        return .run { send in
-                            await send(.suggestionWidget(.chatPanel(.tabClicked(
-                                id: firstChatTabInfo.id
-                            ))))
-                        }
-                    }
-
+                case let .switchWorkspace(path, name):
                     return .run { send in
-                        if let (_, chatTabInfo) = await chatTabPool.createTab(
-                            for: .init(BrowserChatTab.urlChatBuilder(
-                                url: url,
-                                externalDependency: ChatTabFactory
-                                    .externalDependenciesForBrowserChatTab()
-                            ))
-                        ) {
+                        await send(
+                            .suggestionWidget(.chatPanel(.switchWorkspace(path, name)))
+                        )
+                        await send(.initWorkspaceChatTabIfNeeded(path: path))
+                    }
+                case let .initWorkspaceChatTabIfNeeded(path):
+                    guard let chatWorkspace = state.chatHistory.workspaces[id: path], chatWorkspace.tabInfo.isEmpty
+                            else { return .none }
+                    return .run { send in
+                        if let (_, chatTabInfo) = await chatTabPool.createTab(for: nil) {
                             await send(
-                                .suggestionWidget(.chatPanel(.appendAndSelectTab(chatTabInfo)))
-                            )
+                                .suggestionWidget(.chatPanel(.appendTabToWorkspace(chatTabInfo, chatWorkspace)))
+                                )
                         }
                     }
-
-                    #else
-                    return .none
-                    #endif
+//                case let .createAndSwitchToBrowserTabIfNeeded(url):
+//                    #if canImport(BrowserChatTab)
+//                    func match(_ tabURL: URL?) -> Bool {
+//                        guard let tabURL else { return false }
+//                        return tabURL == url
+//                            || tabURL.absoluteString.hasPrefix(url.absoluteString)
+//                    }
+//
+//                    if let selectedTabInfo = state.chatTabGroup.selectedTabInfo,
+//                       let tab = chatTabPool.getTab(of: selectedTabInfo.id) as? BrowserChatTab,
+//                       match(tab.url)
+//                    {
+//                        // Already in the target Browser tab
+//                        return .none
+//                    }
+//
+//                    if let firstChatTabInfo = state.chatTabGroup.tabInfo.first(where: {
+//                        guard let tab = chatTabPool.getTab(of: $0.id) as? BrowserChatTab,
+//                              match(tab.url)
+//                        else { return false }
+//                        return true
+//                    }) {
+//                        return .run { send in
+//                            await send(.suggestionWidget(.chatPanel(.tabClicked(
+//                                id: firstChatTabInfo.id
+//                            ))))
+//                        }
+//                    }
+//
+//                    return .run { send in
+//                        if let (_, chatTabInfo) = await chatTabPool.createTab(
+//                            for: .init(BrowserChatTab.urlChatBuilder(
+//                                url: url,
+//                                externalDependency: ChatTabFactory
+//                                    .externalDependenciesForBrowserChatTab()
+//                            ))
+//                        ) {
+//                            await send(
+//                                .suggestionWidget(.chatPanel(.appendAndSelectTab(chatTabInfo)))
+//                            )
+//                        }
+//                    }
+//
+//                    #else
+//                    return .none
+//                    #endif
 
                 case let .sendCustomCommandToActiveChat(command):
                     @Sendable func stopAndHandleCommand(_ tab: ConversationTab) async {
@@ -204,7 +229,7 @@ struct GUI {
                         try? await tab.service.handleCustomCommand(command)
                     }
 
-                    if let info = state.chatTabGroup.selectedTabInfo,
+                    if let info = state.chatHistory.currentChatWorkspace?.selectedTabInfo,
                        let activeTab = chatTabPool.getTab(of: info.id) as? ConversationTab
                     {
                         return .run { send in
@@ -213,13 +238,15 @@ struct GUI {
                         }
                     }
 
-                    if let info = state.chatTabGroup.tabInfo.first(where: {
+                    if var chatWorkspace = state.chatHistory.currentChatWorkspace, let info = chatWorkspace.tabInfo.first(where: {
                         chatTabPool.getTab(of: $0.id) is ConversationTab
                     }),
                         let chatTab = chatTabPool.getTab(of: info.id) as? ConversationTab
                     {
-                        state.chatTabGroup.selectedTabId = chatTab.id
+                        chatWorkspace.selectedTabId = chatTab.id
+                        let updatedChatWorkspace = chatWorkspace
                         return .run { send in
+                            await send(.suggestionWidget(.chatPanel(.updateChatHistory(updatedChatWorkspace))))
                             await send(.openChatPanel(forceDetach: false))
                             await stopAndHandleCommand(chatTab)
                         }
@@ -252,15 +279,15 @@ struct GUI {
                     return .none
                     #endif
 
-                case let .suggestionWidget(.chatPanel(.closeTabButtonClicked(id))):
-                    #if canImport(ChatTabPersistent)
-                    // when a tab is closed, remove it from persistence.
-                    return .run { send in
-                        await send(.persistent(.chatTabClosed(id: id)))
-                    }
-                    #else
-                    return .none
-                    #endif
+//                case let .suggestionWidget(.chatPanel(.closeTabButtonClicked(id))):
+//                    #if canImport(ChatTabPersistent)
+//                    // when a tab is closed, remove it from persistence.
+//                    return .run { send in
+//                        await send(.persistent(.chatTabClosed(id: id)))
+//                    }
+//                    #else
+//                    return .none
+//                    #endif
 
                 case .suggestionWidget:
                     return .none
@@ -271,20 +298,21 @@ struct GUI {
                 #endif
                 }
             }
-        }.onChange(of: \.chatTabGroup.tabInfo) { old, new in
-            Reduce { _, _ in
-                guard old.map(\.id) != new.map(\.id) else {
-                    return .none
-                }
-                #if canImport(ChatTabPersistent)
-                return .run { send in
-                    await send(.persistent(.chatOrderChanged))
-                }.debounce(id: Debounce.updateChatTabOrder, for: 1, scheduler: DispatchQueue.main)
-                #else
-                return .none
-                #endif
-            }
         }
+//        .onChange(of: \.chatCollection.selectedChatGroup?.tabInfo) { old, new in
+//            Reduce { _, _ in
+//                guard old.map(\.id) != new.map(\.id) else {
+//                    return .none
+//                }
+//                #if canImport(ChatTabPersistent)
+//                return .run { send in
+//                    await send(.persistent(.chatOrderChanged))
+//                }.debounce(id: Debounce.updateChatTabOrder, for: 1, scheduler: DispatchQueue.main)
+//                #else
+//                return .none
+//                #endif
+//            }
+//        }
     }
 }
 
@@ -340,7 +368,7 @@ public final class GraphicalUserInterfaceController {
         chatTabPool.createStore = { id in
             store.scope(
                 state: { state in
-                    state.chatTabGroup.tabInfo[id: id] ?? .init(id: id, title: "")
+                    state.chatHistory.currentChatWorkspace?.tabInfo[id: id] ?? .init(id: id, title: "")
                 },
                 action: { childAction in
                     .suggestionWidget(.chatPanel(.chatTab(id: id, action: childAction)))

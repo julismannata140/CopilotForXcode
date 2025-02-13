@@ -10,44 +10,26 @@ public struct DisplayedChatMessage: Equatable {
     public enum Role: Equatable {
         case user
         case assistant
-        case tool
+        case system
         case ignored
-    }
-
-    public struct Reference: Equatable {
-        public typealias Kind = ChatMessage.Reference.Kind
-
-        public var title: String
-        public var subtitle: String
-        public var uri: String
-        public var startLine: Int?
-        public var kind: Kind
-
-        public init(
-            title: String,
-            subtitle: String,
-            uri: String,
-            startLine: Int?,
-            kind: Kind
-        ) {
-            self.title = title
-            self.subtitle = subtitle
-            self.uri = uri
-            self.startLine = startLine
-            self.kind = kind
-        }
     }
 
     public var id: String
     public var role: Role
     public var text: String
-    public var references: [Reference] = []
+    public var references: [ConversationReference] = []
+    public var followUp: ConversationFollowUp? = nil
+    public var suggestedTitle: String? = nil
+    public var errorMessage: String? = nil
 
-    public init(id: String, role: Role, text: String, references: [Reference]) {
+    public init(id: String, role: Role, text: String, references: [ConversationReference] = [], followUp: ConversationFollowUp? = nil, suggestedTitle: String? = nil, errorMessage: String? = nil) {
         self.id = id
         self.role = role
         self.text = text
         self.references = references
+        self.followUp = followUp
+        self.suggestedTitle = suggestedTitle
+        self.errorMessage = errorMessage
     }
 }
 
@@ -61,12 +43,16 @@ struct Chat {
 
     @ObservableState
     struct State: Equatable {
-        var title: String = "Chat"
+        var title: String = "New Chat"
+        var isTitleSet: Bool = false
+
         var typedMessage = ""
         var history: [DisplayedChatMessage] = []
         var isReceivingMessage = false
         var chatMenu = ChatMenu.State()
         var focusedField: Field?
+        var currentEditor: FileReference? = nil
+        var selectedFiles: [FileReference] = []
 
         enum Field: String, Hashable {
             case textField
@@ -86,10 +72,11 @@ struct Chat {
         case resendMessageButtonTapped(MessageID)
         case setAsExtraPromptButtonTapped(MessageID)
         case focusOnTextField
-        case referenceClicked(DisplayedChatMessage.Reference)
+        case referenceClicked(ConversationReference)
         case upvote(MessageID, ConversationRating)
         case downvote(MessageID, ConversationRating)
         case copyCode(MessageID)
+        case insertCode(String)
 
         case observeChatService
         case observeHistoryChange
@@ -99,6 +86,15 @@ struct Chat {
         case isReceivingMessageChanged
 
         case chatMenu(ChatMenu.Action)
+        
+        // context
+        case addSelectedFile(FileReference)
+        case removeSelectedFile(FileReference)
+        case resetCurrentEditor
+        case setCurrentEditor(FileReference)
+        
+        case followUpButtonClicked(String, String)
+        case setTitle(DisplayedChatMessage)
     }
 
     let service: ChatService
@@ -137,11 +133,25 @@ struct Chat {
                 }
 
             case let .sendButtonTapped(id):
-                guard !state.typedMessage.isEmpty else { return .none }
+                guard !state.typedMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .none }
                 let message = state.typedMessage
+                let skillSet = state.buildSkillSet()
                 state.typedMessage = ""
+                
+                let selectedFiles = state.selectedFiles
+                
                 return .run { _ in
-                    try await service.send(id, content: message)
+                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles)
+                }.cancellable(id: CancelID.sendMessage(self.id))
+                
+            case let .followUpButtonClicked(id, message):
+                guard !message.isEmpty else { return .none }
+                let skillSet = state.buildSkillSet()
+                
+                let selectedFiles = state.selectedFiles
+                
+                return .run { _ in
+                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles)
                 }.cancellable(id: CancelID.sendMessage(self.id))
 
             case .returnButtonTapped:
@@ -177,7 +187,9 @@ struct Chat {
                 }
 
             case let .referenceClicked(reference):
-                let fileURL = URL(fileURLWithPath: reference.uri)
+                guard let fileURL = reference.url else {
+                    return .none
+                }
                 return .run { _ in
                     if FileManager.default.fileExists(atPath: fileURL.path) {
                         let terminal = Terminal()
@@ -186,7 +198,7 @@ struct Chat {
                                 "/bin/bash",
                                 arguments: [
                                     "-c",
-                                    "xed -l \(reference.startLine ?? 0) \"\(reference.uri)\"",
+                                    "xed -l 0 \"\(reference.filePath)\"",
                                 ],
                                 environment: [:]
                             )
@@ -253,42 +265,41 @@ struct Chat {
                         id: message.id,
                         role: {
                             switch message.role {
-                            case .system: return .ignored
+                            case .system: return .system
                             case .user: return .user
                             case .assistant: return .assistant
                             }
                         }(),
-                        text: message.summary ?? message.content,
+                        text: message.content,
                         references: message.references.map {
                             .init(
-                                title: $0.title,
-                                subtitle: $0.subTitle,
                                 uri: $0.uri,
-                                startLine: $0.startLine,
+                                status: $0.status,
                                 kind: $0.kind
                             )
-                        }
+                        },
+                        followUp: message.followUp,
+                        suggestedTitle: message.suggestedTitle,
+                        errorMessage: message.errorMessage
                     ))
 
                     return all
                 }
-
-                state.title = {
-                    let defaultTitle = "Chat"
-                    guard let lastMessageText = state.history
-                        .filter({ $0.role == .assistant || $0.role == .user })
-                        .last?
-                        .text else { return defaultTitle }
-                    if lastMessageText.isEmpty { return defaultTitle }
-                    let trimmed = lastMessageText
-                        .trimmingCharacters(in: .punctuationCharacters)
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    if trimmed.starts(with: "```") {
-                        return "Code Block"
-                    } else {
-                        return trimmed
-                    }
-                }()
+                
+                guard let lastChatMessage = state.history.last else { return .none }
+                return .run { send in
+                    await send(.setTitle(lastChatMessage))
+                }
+                
+            case let .setTitle(message):
+                guard state.isTitleSet == false,
+                      message.role == .assistant,
+                      let suggestedTitle = message.suggestedTitle
+                else { return .none }
+                
+                state.title = suggestedTitle
+                state.isTitleSet = true
+                
                 return .none
 
             case .isReceivingMessageChanged:
@@ -312,6 +323,25 @@ struct Chat {
                 return .run { _ in
                     await service.copyCode(id)
                 }
+                
+            case let .insertCode(code):
+                 ChatInjector().insertCodeBlock(codeBlock: code)
+                 return .none
+
+            case let .addSelectedFile(fileReference):
+                guard !state.selectedFiles.contains(fileReference) else { return .none }
+                state.selectedFiles.append(fileReference)
+                return .none
+            case let .removeSelectedFile(fileReference):
+                guard let index = state.selectedFiles.firstIndex(of: fileReference) else { return .none }
+                state.selectedFiles.remove(at: index)
+                return .none
+            case .resetCurrentEditor:
+                state.currentEditor = nil
+                return .none
+            case let .setCurrentEditor(fileReference):
+                state.currentEditor = fileReference
+                return .none
             }
         }
     }

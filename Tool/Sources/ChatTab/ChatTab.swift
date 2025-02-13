@@ -28,6 +28,9 @@ public protocol ChatTabType {
     /// Build the tabItem for this chat tab.
     @ViewBuilder
     func buildTabItem() -> any View
+    /// Build the chatConversationItem
+    @ViewBuilder
+    func buildChatConversationItem() -> any View
     /// Build the icon for this chat tab.
     @ViewBuilder
     func buildIcon() -> any View
@@ -103,6 +106,16 @@ open class BaseChatTab {
                 .onAppear {
                     Task { @MainActor in self.startIfNotStarted() }
                 }
+        } else {
+            EmptyView().id(id)
+        }
+    }
+    
+    @ViewBuilder
+    public var chatConversationItem: some View {
+        let id = "ChatTabTab\(id)"
+        if let tab = self as? (any ChatTabType) {
+            ContentView(buildView: tab.buildChatConversationItem).id(id)
         } else {
             EmptyView().id(id)
         }
@@ -200,6 +213,10 @@ public class EmptyChatTab: ChatTab {
     }
 
     public func buildTabItem() -> any View {
+        Text("Empty-\(id)")
+    }
+    
+    public func buildChatConversationItem() -> any View {
         Text("Empty-\(id)")
     }
     

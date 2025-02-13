@@ -11,6 +11,7 @@ import Status
 /// We need it because the original one does not allow us to handle custom notifications.
 class CopilotLocalProcessServer {
     public var notificationPublisher: PassthroughSubject<AnyJSONRPCNotification, Never> = PassthroughSubject<AnyJSONRPCNotification, Never>()
+    public var serverRequestPublisher: PassthroughSubject<(AnyJSONRPCRequest, (AnyJSONRPCResponse) -> Void), Never> = PassthroughSubject<(AnyJSONRPCRequest, (AnyJSONRPCResponse) -> Void), Never>()
     
     private let transport: StdioDataTransport
     private let customTransport: CustomDataTransport
@@ -64,6 +65,7 @@ class CopilotLocalProcessServer {
                         } catch {
                             // Handle decoding error
                             print("Error decoding ConversationCreateParams: \(error)")
+                            Logger.gitHubCopilot.error("Error decoding ConversationCreateParams: \(error)")
                         }
                     }
                 }
@@ -76,6 +78,7 @@ class CopilotLocalProcessServer {
                         } catch {
                             // Handle decoding error
                             print("Error decoding TurnCreateParams: \(error)")
+                            Logger.gitHubCopilot.error("Error decoding TurnCreateParams: \(error)")
                         }
                     }
                 }
@@ -84,6 +87,10 @@ class CopilotLocalProcessServer {
         
         wrappedServer?.notificationPublisher.sink(receiveValue: { [weak self] notification in
             self?.notificationPublisher.send(notification)
+        }).store(in: &cancellables)
+        
+        wrappedServer?.serverRequestPublisher.sink(receiveValue: { [weak self] (request, callback) in
+            self?.serverRequestPublisher.send((request, callback))
         }).store(in: &cancellables)
 
         process.standardInput = transport.stdinPipe
@@ -198,6 +205,7 @@ final class CustomJSONRPCLanguageServer: Server {
     public var requestHandler: RequestHandler?
     public var notificationHandler: NotificationHandler?
     public var notificationPublisher: PassthroughSubject<AnyJSONRPCNotification, Never> = PassthroughSubject<AnyJSONRPCNotification, Never>()
+    public var serverRequestPublisher: PassthroughSubject<(AnyJSONRPCRequest, (AnyJSONRPCResponse) -> Void), Never> = PassthroughSubject<(AnyJSONRPCRequest, (AnyJSONRPCResponse) -> Void), Never>()
 
     private var outOfBandError: Error?
 
@@ -313,6 +321,7 @@ extension CustomJSONRPCLanguageServer {
         data: Data,
         callback: @escaping (AnyJSONRPCResponse) -> Void
     ) -> Bool {
+        serverRequestPublisher.send((request: request, callback: callback))
         return false
     }
 }

@@ -88,6 +88,11 @@ public func editorConfiguration() -> JSONValue {
     return .hash(d)
 }
 
+public enum SignInInitiateStatus: String, Codable {
+    case promptUserDeviceFlow = "PromptUserDeviceFlow"
+    case alreadySignedIn = "AlreadySignedIn"
+}
+
 enum GitHubCopilotRequest {
     struct GetVersion: GitHubCopilotRequestType {
         struct Response: Codable {
@@ -112,11 +117,12 @@ enum GitHubCopilotRequest {
 
     struct SignInInitiate: GitHubCopilotRequestType {
         struct Response: Codable {
-            var verificationUri: String
-            var status: String
-            var userCode: String
-            var expiresIn: Int
-            var interval: Int
+            var status: SignInInitiateStatus
+            var userCode: String?
+            var verificationUri: String?
+            var expiresIn: Int?
+            var interval: Int?
+            var user: String?
         }
 
         var request: ClientRequest {
@@ -331,6 +337,16 @@ enum GitHubCopilotRequest {
             return .custom("conversation/rating", dict)
         }
     }
+    
+    // MARK: Conversation templates
+
+    struct GetTemplates: GitHubCopilotRequestType {
+        typealias Response = Array<Template>
+
+        var request: ClientRequest {
+            .custom("conversation/templates", .hash([:]))
+        }
+    }
 
     // MARK: Copy code
 
@@ -343,6 +359,20 @@ enum GitHubCopilotRequest {
             let data = (try? JSONEncoder().encode(params)) ?? Data()
             let dict = (try? JSONDecoder().decode(JSONValue.self, from: data)) ?? .hash([:])
             return .custom("conversation/copyCode", dict)
+        }
+    }
+    
+    // MARK: Telemetry
+
+    struct TelemetryException: GitHubCopilotRequestType {
+        struct Response: Codable {}
+
+        var params: TelemetryExceptionParams
+
+        var request: ClientRequest {
+            let data = (try? JSONEncoder().encode(params)) ?? Data()
+            let dict = (try? JSONDecoder().decode(JSONValue.self, from: data)) ?? .hash([:])
+            return .custom("telemetry/exception", dict)
         }
     }
 }

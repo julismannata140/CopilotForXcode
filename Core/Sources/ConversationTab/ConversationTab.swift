@@ -11,6 +11,7 @@ import SwiftUI
 
 /// A chat tab that provides a context aware chat bot, powered by Chat.
 public class ConversationTab: ChatTab {
+    
     public static var name: String { "Chat" }
 
     public let service: ChatService
@@ -18,6 +19,13 @@ public class ConversationTab: ChatTab {
     private var cancellable = Set<AnyCancellable>()
     private var observer = NSObject()
     private let updateContentDebounce = DebounceRunner(duration: 0.5)
+    
+    // Get chat tab title. As the tab title is always "Chat" and won't be modified.
+    // Use the chat title as the tab title.
+    // TODO: modify tab title dynamicly
+    public func getChatTabTitle() -> String {
+        return chat.title
+    }
 
     struct RestorableState: Codable {
         var history: [ChatAPIService.ChatMessage]
@@ -44,6 +52,10 @@ public class ConversationTab: ChatTab {
 
     public func buildTabItem() -> any View {
         ChatTabItemView(chat: chat)
+    }
+    
+    public func buildChatConversationItem() -> any View {
+        ChatConversationItemView(chat: chat)
     }
 
     public func buildIcon() -> any View {

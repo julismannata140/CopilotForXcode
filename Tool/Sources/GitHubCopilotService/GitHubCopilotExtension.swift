@@ -1,6 +1,7 @@
 import BuiltinExtension
 import CopilotForXcodeKit
 import ConversationServiceProvider
+import TelemetryServiceProvider
 import Foundation
 import LanguageServerProtocol
 import Logger
@@ -11,8 +12,8 @@ public final class GitHubCopilotExtension: BuiltinExtension {
     public var suggestionServiceId: Preferences.BuiltInSuggestionFeatureProvider { .gitHubCopilot }
 
     public let suggestionService: GitHubCopilotSuggestionService?
-    
     public let conversationService: ConversationServiceType?
+    public let telemetryService: TelemetryServiceType?
 
     private var extensionUsage = ExtensionUsage(
         isSuggestionServiceInUse: false,
@@ -33,6 +34,8 @@ public final class GitHubCopilotExtension: BuiltinExtension {
         self.suggestionService = suggestionService
         let conversationService = GitHubCopilotConversationService.init(serviceLocator: serviceLocator)
         self.conversationService = conversationService
+        let telemetryService = GitHubCopilotTelemetryService.init(serviceLocator: serviceLocator)
+        self.telemetryService = telemetryService
     }
 
     public func workspaceDidOpen(_: WorkspaceInfo) {}

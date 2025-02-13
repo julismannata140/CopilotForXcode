@@ -1,0 +1,20 @@
+{
+  "images" : [
+    {
+      "filename" : "Xcode_16x16.svg",
+      "idiom" : "universal",
+      "scale" : "1x",
+      "size" : "16x16"
+    },
+    {
+      "filename" : "Xcode_32x32.svg",
+      "idiom" : "universal",
+      "scale" : "2x",
+      "size" : "32x32"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

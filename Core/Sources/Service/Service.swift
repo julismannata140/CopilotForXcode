@@ -77,6 +77,7 @@ public final class Service {
         let scheduledCleaner = ScheduledCleaner()
 
         scheduledCleaner.service = self
+        Logger.telemetryLogger = TelemetryLogger()
     }
 
     @MainActor
@@ -95,9 +96,22 @@ public final class Service {
                 .compactMap { $0 }
                 .sink { [weak self] fileURL in
                     Task {
-                        try await self?.workspacePool
-                            .fetchOrCreateWorkspaceAndFilespace(fileURL: fileURL)
+                        do {
+                            try await self?.workspacePool
+                                .fetchOrCreateWorkspaceAndFilespace(fileURL: fileURL)
+                        } catch {
+                            Logger.workspacePool.error(error)
+                        }
                     }
+                }.store(in: &cancellable)
+            
+            await XcodeInspector.shared.safe.$activeWorkspaceURL.receive(on: DispatchQueue.main)
+                .sink { newURL in
+                    if let path = newURL?.path, self.guiController.store.chatHistory.selectedWorkspacePath != path {
+                        let name = self.getDisplayNameOfXcodeWorkspace(url: newURL!)
+                        self.guiController.store.send(.switchWorkspace(path: path, name: name))
+                    }
+                    
                 }.store(in: &cancellable)
         }
     }
@@ -107,6 +121,18 @@ public final class Service {
         Logger.service.info("Prepare for exit.")
         keyBindingManager.stopForExit()
         await scheduledCleaner.closeAllChildProcesses()
+    }
+
+    private func getDisplayNameOfXcodeWorkspace(url: URL) -> String {
+        var name = url.lastPathComponent
+        let suffixes = [".xcworkspace", ".xcodeproj"]
+        for suffix in suffixes {
+            if name.hasSuffix(suffix) {
+                name = String(name.dropLast(suffix.count))
+                break
+            }
+        }
+        return name
     }
 }
 

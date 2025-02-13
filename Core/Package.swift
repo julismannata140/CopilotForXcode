@@ -33,6 +33,7 @@ let package = Package(
                 "Client",
                 "LaunchAgentManager",
                 "UpdateChecker",
+                "GitHubCopilotViewModel",
             ]
         ),
     ],
@@ -52,6 +53,8 @@ let package = Package(
             .package(url: "https://github.com/devm33/KeyboardShortcuts", branch: "main"),
         .package(url: "https://github.com/devm33/CGEventOverride", branch: "devm33/fix-stale-AXIsProcessTrusted"),
         .package(url: "https://github.com/devm33/Highlightr", branch: "master"),
+        .package(url: "https://github.com/globulus/swiftui-flow-layout",
+                 from: "1.0.5")
     ],
     targets: [
         // MARK: - Main
@@ -76,6 +79,7 @@ let package = Package(
                 "ConversationTab",
                 "KeyBindingManager",
                 "XcodeThemeController",
+                .product(name: "TelemetryService", package: "Tool"),
                 .product(name: "XPCShared", package: "Tool"),
                 .product(name: "SuggestionProvider", package: "Tool"),
                 .product(name: "ConversationServiceProvider", package: "Tool"),
@@ -84,10 +88,12 @@ let package = Package(
                 .product(name: "AppMonitoring", package: "Tool"),
                 .product(name: "SuggestionBasic", package: "Tool"),
                 .product(name: "Status", package: "Tool"),
+                .product(name: "StatusBarItemView", package: "Tool"),
                 .product(name: "ChatTab", package: "Tool"),
                 .product(name: "Logger", package: "Tool"),
                 .product(name: "ChatAPIService", package: "Tool"),
                 .product(name: "Preferences", package: "Tool"),
+                .product(name: "AXHelper", package: "Tool"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "Dependencies", package: "swift-dependencies"),
@@ -114,6 +120,7 @@ let package = Package(
                 dependencies: [
                     "Client",
                     "LaunchAgentManager",
+                    "GitHubCopilotViewModel",
                     .product(name: "SuggestionProvider", package: "Tool"),
                     .product(name: "Toast", package: "Tool"),
                     .product(name: "SharedUIComponents", package: "Tool"),
@@ -167,6 +174,7 @@ let package = Package(
                     .product(name: "Parsing", package: "swift-parsing"),
                     .product(name: "ChatAPIService", package: "Tool"),
                     .product(name: "Preferences", package: "Tool"),
+                    .product(name: "AXHelper", package: "Tool"),
                     .product(name: "ConversationServiceProvider", package: "Tool"),
                     .product(name: "GitHubCopilotService", package: "Tool"),
                 ]),
@@ -180,8 +188,10 @@ let package = Package(
                     .product(name: "Logger", package: "Tool"),
                     .product(name: "ChatTab", package: "Tool"),
                     .product(name: "Terminal", package: "Tool"),
+                    .product(name: "Cache", package: "Tool"),
                     .product(name: "MarkdownUI", package: "swift-markdown-ui"),
                     .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                    .product(name: "SwiftUIFlowLayout", package: "swiftui-flow-layout")
                 ]
             ),
         
@@ -192,6 +202,7 @@ let package = Package(
                 dependencies: [
                     "PromptToCodeService",
                     "ConversationTab",
+                    "GitHubCopilotViewModel",
                     .product(name: "GitHubCopilotService", package: "Tool"),
                     .product(name: "Toast", package: "Tool"),
                     .product(name: "UserDefaultsObserver", package: "Tool"),
@@ -209,7 +220,7 @@ let package = Package(
         
         // MARK: - Helpers
         
-            .target(name: "FileChangeChecker"),
+        .target(name: "FileChangeChecker"),
         .target(
             name: "LaunchAgentManager",
             dependencies: [
@@ -222,6 +233,14 @@ let package = Package(
                 "Sparkle",
                 .product(name: "Preferences", package: "Tool"),
                 .product(name: "Logger", package: "Tool"),
+            ]
+        ),
+        .target(
+            name: "GitHubCopilotViewModel",
+            dependencies: [
+                .product(name: "GitHubCopilotService", package: "Tool"),
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "Status", package: "Tool"),
             ]
         ),
 
